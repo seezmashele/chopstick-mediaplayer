@@ -27,6 +27,7 @@ class MpvItem : public QQuickFramebufferObject
     Q_PROPERTY(bool paused READ paused NOTIFY pausedChanged)
     Q_PROPERTY(bool muted READ muted NOTIFY mutedChanged)
     Q_PROPERTY(double volume READ volume NOTIFY volumeChanged)
+    Q_PROPERTY(QString fileName READ fileName NOTIFY fileNameChanged)
     Q_PROPERTY(QString videoCodec READ videoCodec NOTIFY videoCodecChanged)
     Q_PROPERTY(QString audioCodec READ audioCodec NOTIFY audioCodecChanged)
     Q_PROPERTY(int videoWidth READ videoWidth NOTIFY videoSizeChanged)
@@ -52,6 +53,7 @@ public:
     bool paused() const { return m_paused; }
     bool muted() const { return m_muted; }
     double volume() const { return m_volume; }
+    QString fileName() const { return m_fileName; }
     QString videoCodec() const { return m_videoCodec; }
     QString audioCodec() const { return m_audioCodec; }
     int videoWidth() const { return m_videoWidth; }
@@ -90,6 +92,7 @@ signals:
     void pausedChanged();
     void mutedChanged();
     void volumeChanged();
+    void fileNameChanged();
     void videoCodecChanged();
     void audioCodecChanged();
     void videoSizeChanged();
@@ -112,6 +115,7 @@ private:
     bool m_paused = false;
     bool m_muted = false;
     double m_volume = 100.0;
+    QString m_fileName;
     QString m_videoCodec;
     QString m_audioCodec;
     int m_videoWidth = 0;

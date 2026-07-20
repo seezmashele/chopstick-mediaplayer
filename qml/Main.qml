@@ -45,6 +45,10 @@ Window {
         player.forceActiveFocus();
     }
 
+    // Shared size for general UI text (status row, playlist rows, button
+    // labels). Icon glyph sizes and the filename badge are set separately.
+    readonly property int uiFontSize: 13
+
     // --- Auto-hiding control bar -------------------------------------------
     // The bar only appears while the pointer is near the bottom of the window,
     // and slides away a few seconds after the last movement down there.
@@ -71,6 +75,35 @@ Window {
             else
                 root.controlsVisible = false;
         }
+    }
+
+    // --- Transient info badge (top-left OSD) -------------------------------
+    // Shows either the filename or a volume readout, then fades out.
+    property bool badgeVisible: false
+    property string badgeMode: "title" // "title" | "volume"
+
+    Timer {
+        id: badgeTimer
+        interval: 3000
+        onTriggered: root.badgeVisible = false
+    }
+
+    // Flash the current filename.
+    function showTitle() {
+        if (player.fileName === "")
+            return;
+        root.badgeMode = "title";
+        root.badgeVisible = true;
+        badgeTimer.restart();
+    }
+
+    // Flash the current volume. The label binds to player.volume rather than
+    // capturing it here, because mpv applies volume changes asynchronously —
+    // formatting now would show the previous value.
+    function showVolume() {
+        root.badgeMode = "volume";
+        root.badgeVisible = true;
+        badgeTimer.restart();
     }
 
     // Called on pointer movement; only movement near the bottom wakes the bar.
@@ -139,7 +172,7 @@ Window {
                 visible: ib.label !== ""
                 text: ib.label
                 color: ib.color
-                font.pixelSize: 12
+                font.pixelSize: root.uiFontSize
             }
         }
 
@@ -168,6 +201,20 @@ Window {
                 break;
             case Qt.Key_Right:
                 player.command(["seek", 5]);
+                event.accepted = true;
+                break;
+            case Qt.Key_Up:
+                player.command(["add", "volume", 5]);
+                root.showVolume();
+                event.accepted = true;
+                break;
+            case Qt.Key_Down:
+                player.command(["add", "volume", -5]);
+                root.showVolume();
+                event.accepted = true;
+                break;
+            case Qt.Key_N:
+                root.showTitle();
                 event.accepted = true;
                 break;
             case Qt.Key_S:
@@ -222,6 +269,9 @@ Window {
             if (startupFiles && startupFiles.length > 0)
                 player.openPaths(startupFiles);
         }
+
+        // Flash the name whenever a new file starts playing.
+        onFileNameChanged: root.showTitle()
     }
 
     // Drop video files anywhere on the window to play them. First file replaces
@@ -242,9 +292,9 @@ Window {
         }
     }
 
-    // Drag the video to move the window; double-click to toggle fullscreen.
-    // Covers the video region only (stops at the control bar so it doesn't
-    // interfere with the seek bar / buttons).
+    // Click the video to play/pause, drag it to move the window, double-click
+    // to toggle fullscreen. Covers the video region only (stops at the control
+    // bar so it doesn't interfere with the seek bar / buttons).
     MouseArea {
         anchors {
             left: parent.left
@@ -256,20 +306,92 @@ Window {
         hoverEnabled: true // needed to track the pointer for the auto-hiding bar
         property real pressX: 0
         property real pressY: 0
+        property bool draggedWindow: false
 
         onPressed: (mouse) => {
             pressX = mouse.x;
             pressY = mouse.y;
+            draggedWindow = false;
         }
         onPositionChanged: (mouse) => {
             root.nudgeControls(mouse.y);
             // Only begin a window move once it's clearly a drag, so a stationary
-            // double-click still registers.
-            if (pressed && (Math.abs(mouse.x - pressX) > 8
-                            || Math.abs(mouse.y - pressY) > 8))
+            // click / double-click still registers. Fire it once per press.
+            if (pressed && !draggedWindow
+                && (Math.abs(mouse.x - pressX) > 8
+                    || Math.abs(mouse.y - pressY) > 8)) {
+                draggedWindow = true;
                 player.beginWindowDrag();
+            }
         }
-        onDoubleClicked: root.toggleFullScreen()
+        onClicked: {
+            // A drag that moved the window shouldn't also toggle playback.
+            if (!draggedWindow)
+                player.command(["cycle", "pause"]);
+            player.forceActiveFocus();
+        }
+        onDoubleClicked: {
+            // Qt delivers onClicked for the *first* click of a double-click, so
+            // that already flipped pause — undo it, leaving playback untouched.
+            player.command(["cycle", "pause"]);
+            root.toggleFullScreen();
+        }
+
+        // Scroll over the video to change volume in 5% steps.
+        property real wheelAccum: 0
+        onWheel: (wheel) => {
+            // A notched mouse wheel sends ±120 per detent; high-resolution
+            // wheels and touchpads send many small deltas. Accumulate so both
+            // step evenly instead of the touchpad racing through the range.
+            wheelAccum += wheel.angleDelta.y;
+            while (wheelAccum >= 120) {
+                player.command(["add", "volume", 5]);
+                wheelAccum -= 120;
+            }
+            while (wheelAccum <= -120) {
+                player.command(["add", "volume", -5]);
+                wheelAccum += 120;
+            }
+            root.showVolume();
+            wheel.accepted = true;
+        }
+    }
+
+    // Transient filename badge, top-left. Shown when a file starts playing and
+    // on demand (N), then fades out after 3s.
+    Rectangle {
+        id: infoBadge
+        anchors {
+            top: parent.top
+            left: parent.left
+            margins: 16
+        }
+        width: Math.min(badgeLabel.implicitWidth + 24, root.width * 0.5)
+        height: 38
+        radius: 6
+        color: Qt.rgba(10 / 255, 10 / 255, 10 / 255, 0.85)
+        opacity: root.badgeVisible ? 1 : 0
+        visible: opacity > 0
+
+        Behavior on opacity {
+            NumberAnimation { duration: 220 }
+        }
+
+        Text {
+            id: badgeLabel
+            anchors {
+                fill: parent
+                leftMargin: 12
+                rightMargin: 12
+            }
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+            text: root.badgeMode === "volume"
+                ? "vol: " + Math.round(player.volume)
+                : player.fileName
+            color: "#f0f0f0"
+            font.pixelSize: 18
+        }
     }
 
     // Playlist panel — overlays the video on the right. Its bottom tracks
@@ -301,6 +423,9 @@ Window {
             anchors.fill: parent
             hoverEnabled: true
             onPositionChanged: (mouse) => root.nudgeControls(mouse.y)
+            // Swallow wheel events so scrolling over panel background doesn't
+            // fall through to the video and change the volume.
+            onWheel: (wheel) => { wheel.accepted = true; }
         }
 
         IconButton {
@@ -362,14 +487,14 @@ Window {
                             visible: !modelData.current
                             text: index + 1
                             color: "#8a8a8a"
-                            font.pixelSize: 12
+                            font.pixelSize: root.uiFontSize
                         }
                         Text {
                             anchors.centerIn: parent
                             visible: modelData.current
                             text: root.ph.play
                             font.family: phosphorFont.font.family
-                            font.pixelSize: 12
+                            font.pixelSize: 12 // icon metric, not body text
                             color: "#ffcf8a"
                         }
                     }
@@ -380,7 +505,7 @@ Window {
                         elide: Text.ElideRight
                         text: modelData.title
                         color: modelData.current ? "#ffffff" : "#d0d0d0"
-                        font.pixelSize: 12
+                        font.pixelSize: root.uiFontSize
                     }
                 }
 
@@ -620,11 +745,20 @@ Window {
                         width: 110
                         height: 30
                         anchors.verticalCenter: parent.verticalCenter
+                        property bool dragging: false
                         property real fraction: Math.max(0, Math.min(1, player.volume / 100))
+
+                        // Glide when volume changes from keys / scroll, but stay
+                        // 1:1 with the cursor while dragging the slider itself.
+                        Behavior on fraction {
+                            enabled: !volBar.dragging
+                            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                        }
 
                         function setAt(x) {
                             var f = Math.max(0, Math.min(1, x / width));
                             player.command(["set", "volume", f * 100]);
+                            root.showVolume();
                             player.forceActiveFocus();
                         }
 
@@ -652,10 +786,9 @@ Window {
                         }
                         MouseArea {
                             anchors.fill: parent
-                            property bool dragging: false
-                            onPressed: (mouse) => { dragging = true; volBar.setAt(mouse.x); }
-                            onPositionChanged: (mouse) => { if (dragging) volBar.setAt(mouse.x); }
-                            onReleased: dragging = false
+                            onPressed: (mouse) => { volBar.dragging = true; volBar.setAt(mouse.x); }
+                            onPositionChanged: (mouse) => { if (volBar.dragging) volBar.setAt(mouse.x); }
+                            onReleased: volBar.dragging = false
                         }
                     }
                 }
@@ -673,7 +806,7 @@ Window {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     color: "#e8e8e8"
-                    font.pixelSize: 13
+                    font.pixelSize: root.uiFontSize
                     text: (player.paused ? "Paused" : "Playing")
                           + "   ·   " + (player.videoCodec !== "" ? player.videoCodec : "—")
                           + "   ·   " + (player.videoWidth > 0 ? player.videoWidth + "×" + player.videoHeight : "—")
@@ -703,7 +836,7 @@ Window {
                         leftPadding: 4
                         verticalAlignment: Text.AlignVCenter
                         color: "#e8e8e8"
-                        font.pixelSize: 13
+                        font.pixelSize: root.uiFontSize
                         text: root.fmt(player.position) + " / " + root.fmt(player.duration)
                     }
                 }
