@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick)
+find_package(Qt6 REQUIRED COMPONENTS Quick Svg)
 qt_standard_project_setup(REQUIRES 6.5)
 
 find_package(PkgConfig REQUIRED)
@@ -30,11 +30,13 @@ qt_add_qml_module(chopstick
         src/mpvitem.cpp
     RESOURCES
         assets/fonts/Phosphor.ttf
+        assets/icons/chopstick-logo.svg
 )
 
 target_include_directories(chopstick PRIVATE src)
 
 target_link_libraries(chopstick PRIVATE
     Qt6::Quick
+    Qt6::Svg          # lets QIcon render the SVG app logo
     PkgConfig::MPV
 )

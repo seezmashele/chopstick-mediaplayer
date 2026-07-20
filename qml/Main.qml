@@ -45,6 +45,37 @@ Window {
         player.forceActiveFocus();
     }
 
+    // --- Auto-hiding control bar -------------------------------------------
+    // The bar only appears while the pointer is near the bottom of the window,
+    // and slides away a few seconds after the last movement down there.
+    readonly property int controlsHotZone: 140
+    property bool controlsVisible: true
+
+    // Individually toggleable sections of the bar (Ctrl+2 / Ctrl+5).
+    property bool controlsRowVisible: true
+    property bool statusRowVisible: true
+
+    Timer {
+        id: hideControlsTimer
+        interval: 3000
+        running: true
+        onTriggered: {
+            // Never hide out from under an active interaction.
+            if (barHover.hovered || seekBar.seeking)
+                restart();
+            else
+                root.controlsVisible = false;
+        }
+    }
+
+    // Called on pointer movement; only movement near the bottom wakes the bar.
+    function nudgeControls(y) {
+        if (y >= root.height - root.controlsHotZone) {
+            root.controlsVisible = true;
+            hideControlsTimer.restart();
+        }
+    }
+
     // Phosphor icon font, bundled as a module resource.
     FontLoader {
         id: phosphorFont
@@ -141,6 +172,18 @@ Window {
                 root.cycleAudioTrack();
                 event.accepted = true;
                 break;
+            case Qt.Key_2:
+                if (event.modifiers & Qt.ControlModifier) {
+                    root.controlsRowVisible = !root.controlsRowVisible;
+                    event.accepted = true;
+                }
+                break;
+            case Qt.Key_5:
+                if (event.modifiers & Qt.ControlModifier) {
+                    root.statusRowVisible = !root.statusRowVisible;
+                    event.accepted = true;
+                }
+                break;
             case Qt.Key_Return:
             case Qt.Key_Enter:
                 if (event.modifiers & Qt.AltModifier) {
@@ -198,6 +241,7 @@ Window {
             bottom: controlBar.top
         }
         acceptedButtons: Qt.LeftButton
+        hoverEnabled: true // needed to track the pointer for the auto-hiding bar
         property real pressX: 0
         property real pressY: 0
 
@@ -206,6 +250,7 @@ Window {
             pressY = mouse.y;
         }
         onPositionChanged: (mouse) => {
+            root.nudgeControls(mouse.y);
             // Only begin a window move once it's clearly a drag, so a stationary
             // double-click still registers.
             if (pressed && (Math.abs(mouse.x - pressX) > 8
@@ -222,10 +267,26 @@ Window {
             left: parent.left
             right: parent.right
             bottom: parent.bottom
+            // Slide fully out of view when hidden. Moving the item (rather than
+            // just fading it) also frees the region: the video MouseArea is
+            // anchored to controlBar.top, so it extends to the window bottom and
+            // can detect the pointer entering the hot zone.
+            bottomMargin: root.controlsVisible ? 0 : -controlBar.height
         }
         height: contentColumn.implicitHeight + 20
-        // rgba(10, 10, 10, 0.85) — alpha kept in the color so child controls stay opaque.
-        color: Qt.rgba(10 / 255, 10 / 255, 10 / 255, 0.85)
+        // rgba(10, 10, 10, 0.9) — alpha kept in the color so child controls stay opaque.
+        color: Qt.rgba(10 / 255, 10 / 255, 10 / 255, 0.9)
+        opacity: root.controlsVisible ? 1 : 0
+
+        Behavior on anchors.bottomMargin {
+            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+        }
+        Behavior on opacity {
+            NumberAnimation { duration: 200 }
+        }
+
+        // Keeps the bar awake while the pointer rests on it.
+        HoverHandler { id: barHover }
 
         Column {
             id: contentColumn
@@ -324,10 +385,11 @@ Window {
                 }
             }
 
-            // Controls row: playback buttons (left) + volume (right).
+            // Controls row: playback buttons (left) + volume (right). Ctrl+2.
             Item {
                 width: parent.width
                 height: 32
+                visible: root.controlsRowVisible
 
                 Row { // playback buttons
                     anchors.left: parent.left
@@ -417,11 +479,12 @@ Window {
                 }
             }
 
-            // Info row: left = status/codec/resolution/audio,
-            // right = subtitle + audio-track buttons, then times.
+            // Info/status row: left = status/codec/resolution/audio,
+            // right = subtitle + audio-track buttons, then times. Ctrl+5.
             Item {
                 width: parent.width
                 height: 30
+                visible: root.statusRowVisible
 
                 Text {
                     id: infoText

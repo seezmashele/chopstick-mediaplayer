@@ -1,6 +1,7 @@
 #include <clocale>
 
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
@@ -13,6 +14,11 @@ int main(int argc, char *argv[])
 
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName(QStringLiteral("Chopstick Media Player"));
+    // Wayland compositors resolve the window icon via the .desktop file matched
+    // to this name, so set it alongside the icon itself.
+    QGuiApplication::setDesktopFileName(QStringLiteral("chopstick"));
+    QGuiApplication::setWindowIcon(
+        QIcon(QStringLiteral(":/qt/qml/Chopstick/assets/icons/chopstick-logo.svg")));
 
     // libmpv requires the C numeric locale; Qt may have switched it. Reset it
     // AFTER constructing QGuiApplication, or mpv_initialize misbehaves.

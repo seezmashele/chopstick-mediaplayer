@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Chopstick Media Player</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#33261a"/>
+      <stop offset="1" stop-color="#0e0c0a"/>
+    </linearGradient>
+    <linearGradient id="stickTop" x1="0" y1="0" x2="1" y2="0.4">
+      <stop offset="0" stop-color="#ffdca8"/>
+      <stop offset="1" stop-color="#dd9a54"/>
+    </linearGradient>
+    <linearGradient id="stickBottom" x1="0" y1="0" x2="1" y2="-0.4">
+      <stop offset="0" stop-color="#d9975a"/>
+      <stop offset="1" stop-color="#a2652f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded-square badge -->
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#bg)"/>
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="14.25"
+        fill="none" stroke="#ffffff" stroke-opacity="0.09"/>
+
+  <!-- Two tapered chopsticks angled toward each other, tips not quite touching
+       (a pinch). Thick at the handle, thin at the tip. The overall silhouette
+       still points right, echoing a play arrow. -->
+  <g stroke-linejoin="round" stroke-width="1.8">
+    <path d="M19.22 11.67 L48.53 28.01 L47.47 30.39 L15.78 19.33 Z"
+          fill="url(#stickTop)" stroke="url(#stickTop)"/>
+    <path d="M15.78 44.67 L47.47 33.61 L48.53 35.99 L19.22 52.33 Z"
+          fill="url(#stickBottom)" stroke="url(#stickBottom)"/>
+  </g>
+</svg>
