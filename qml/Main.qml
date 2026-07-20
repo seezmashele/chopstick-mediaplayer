@@ -22,12 +22,28 @@ Window {
         return (h > 0 ? h + ":" : "") + mm + ":" + ss;
     }
 
-    // A small icon button whose glyph is drawn (font-independent). `kind` is one
-    // of: play, pause, prev, next, volume, mute.
+    // Phosphor icon font, bundled as a module resource.
+    FontLoader {
+        id: phosphorFont
+        source: "../assets/fonts/Phosphor.ttf"
+    }
+
+    // Phosphor icon codepoints (Private Use Area) for the glyphs we use.
+    readonly property var ph: ({
+        "play": String.fromCharCode(0xe3d0),
+        "pause": String.fromCharCode(0xe39e),
+        "prev": String.fromCharCode(0xe5a4),
+        "next": String.fromCharCode(0xe5a6),
+        "volume": String.fromCharCode(0xe44a),
+        "mute": String.fromCharCode(0xe45a)
+    })
+
+    // A small icon button rendering a Phosphor glyph.
     component IconButton: Item {
         id: ib
-        property string kind
+        property string glyph
         property color color: "#f0f0f0"
+        property int glyphSize: 22
         signal clicked()
 
         implicitWidth: 38
@@ -39,53 +55,13 @@ Window {
             color: hover.hovered ? Qt.rgba(1, 1, 1, 0.12) : "transparent"
         }
 
-        Canvas {
-            id: cv
+        Text {
             anchors.centerIn: parent
-            width: 18
-            height: 18
-            onPaint: {
-                var c = getContext("2d");
-                c.reset();
-                c.fillStyle = ib.color;
-                c.strokeStyle = ib.color;
-                c.lineWidth = 1.6;
-                var w = width, h = height;
-                if (ib.kind === "play") {
-                    c.beginPath();
-                    c.moveTo(3, 2); c.lineTo(3, h - 2); c.lineTo(w - 3, h / 2);
-                    c.closePath(); c.fill();
-                } else if (ib.kind === "pause") {
-                    c.fillRect(3, 2, 4, h - 4);
-                    c.fillRect(w - 7, 2, 4, h - 4);
-                } else if (ib.kind === "prev") {
-                    c.fillRect(2, 2, 3, h - 4);
-                    c.beginPath();
-                    c.moveTo(w - 3, 2); c.lineTo(w - 3, h - 2); c.lineTo(7, h / 2);
-                    c.closePath(); c.fill();
-                } else if (ib.kind === "next") {
-                    c.fillRect(w - 5, 2, 3, h - 4);
-                    c.beginPath();
-                    c.moveTo(3, 2); c.lineTo(3, h - 2); c.lineTo(w - 7, h / 2);
-                    c.closePath(); c.fill();
-                } else if (ib.kind === "volume" || ib.kind === "mute") {
-                    c.beginPath(); // speaker body + cone
-                    c.moveTo(1, h / 2 - 3); c.lineTo(5, h / 2 - 3); c.lineTo(9, 2);
-                    c.lineTo(9, h - 2); c.lineTo(5, h / 2 + 3); c.lineTo(1, h / 2 + 3);
-                    c.closePath(); c.fill();
-                    if (ib.kind === "mute") {
-                        c.beginPath();
-                        c.moveTo(12, 4); c.lineTo(w, h - 4); c.stroke();
-                    } else {
-                        c.beginPath(); c.arc(10, h / 2, 3.5, -Math.PI / 3, Math.PI / 3); c.stroke();
-                        c.beginPath(); c.arc(10, h / 2, 6.5, -Math.PI / 3, Math.PI / 3); c.stroke();
-                    }
-                }
-            }
+            text: ib.glyph
+            color: ib.color
+            font.family: phosphorFont.font.family
+            font.pixelSize: ib.glyphSize
         }
-
-        onKindChanged: cv.requestPaint()
-        onColorChanged: cv.requestPaint()
 
         HoverHandler { id: hover }
         MouseArea {
@@ -156,7 +132,8 @@ Window {
             bottom: parent.bottom
         }
         height: contentColumn.implicitHeight + 20
-        color: Qt.rgba(0, 0, 0, 0.45)
+        // #0a0a0a at 80% opacity (alpha kept in the color so child controls stay opaque).
+        color: Qt.rgba(0x0a / 255, 0x0a / 255, 0x0a / 255, 0.8)
 
         Column {
             id: contentColumn
@@ -266,21 +243,21 @@ Window {
                     spacing: 4
 
                     IconButton {
-                        kind: "prev"
+                        glyph: root.ph.prev
                         onClicked: {
                             player.command(["playlist-prev", "weak"]);
                             player.forceActiveFocus();
                         }
                     }
                     IconButton {
-                        kind: player.paused ? "play" : "pause"
+                        glyph: player.paused ? root.ph.play : root.ph.pause
                         onClicked: {
                             player.command(["cycle", "pause"]);
                             player.forceActiveFocus();
                         }
                     }
                     IconButton {
-                        kind: "next"
+                        glyph: root.ph.next
                         onClicked: {
                             player.command(["playlist-next", "weak"]);
                             player.forceActiveFocus();
@@ -294,7 +271,7 @@ Window {
                     spacing: 6
 
                     IconButton {
-                        kind: player.muted ? "mute" : "volume"
+                        glyph: player.muted ? root.ph.mute : root.ph.volume
                         anchors.verticalCenter: parent.verticalCenter
                         onClicked: {
                             player.command(["cycle", "mute"]);

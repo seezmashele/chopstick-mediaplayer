@@ -53,6 +53,11 @@ cmake --build build
   libmpv, and loads the QML.
 - `qml/Main.qml` — window + full-bleed `MpvItem` + keyboard shortcuts.
 
+## Credits
+
+- UI icons use the [Phosphor](https://phosphoricons.com) icon font (MIT), bundled at
+  `assets/fonts/Phosphor.ttf`.
+
 ## Roadmap
 
 - Milestone 2: custom QML control bar (play/pause, seek slider, volume, time,

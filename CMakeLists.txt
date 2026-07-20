@@ -28,6 +28,8 @@ qt_add_qml_module(chopstick
     SOURCES
         src/mpvitem.h
         src/mpvitem.cpp
+    RESOURCES
+        assets/fonts/Phosphor.ttf
 )
 
 target_include_directories(chopstick PRIVATE src)
