@@ -1,6 +1,7 @@
 #include "mpvitem.h"
 
 #include <cstdint>
+#include <cstring>
 
 #include <QOpenGLContext>
 #include <QOpenGLFramebufferObject>
@@ -18,6 +19,18 @@ void *getProcAddressMpv(void *ctx, const char *name)
     if (!glctx)
         return nullptr;
     return reinterpret_cast<void *>(glctx->getProcAddress(QByteArray(name)));
+}
+
+// Look up a value by key in an mpv node map; returns nullptr if absent.
+const mpv_node *mapGet(const mpv_node *map, const char *key)
+{
+    if (!map || map->format != MPV_FORMAT_NODE_MAP)
+        return nullptr;
+    const mpv_node_list *l = map->u.list;
+    for (int i = 0; i < l->num; ++i)
+        if (std::strcmp(l->keys[i], key) == 0)
+            return &l->values[i];
+    return nullptr;
 }
 
 // Renders mpv's video output into the FBO that Qt then draws as a textured
@@ -125,6 +138,7 @@ MpvItem::MpvItem(QQuickItem *parent) : QQuickFramebufferObject(parent)
     mpv_observe_property(m_mpv, 0, "audio-codec-name", MPV_FORMAT_STRING);
     mpv_observe_property(m_mpv, 0, "video-params/w", MPV_FORMAT_INT64);
     mpv_observe_property(m_mpv, 0, "video-params/h", MPV_FORMAT_INT64);
+    mpv_observe_property(m_mpv, 0, "track-list", MPV_FORMAT_NODE);
 }
 
 MpvItem::~MpvItem()
@@ -271,5 +285,41 @@ void MpvItem::handlePropertyChange(mpv_event_property *prop)
                             ? static_cast<int>(*static_cast<int64_t *>(prop->data))
                             : 0;
         emit videoSizeChanged();
+    } else if (name == "track-list") {
+        int aCount = 0, aCur = 0, sCount = 0, sCur = 0;
+        if (prop->format == MPV_FORMAT_NODE) {
+            const mpv_node *node = static_cast<mpv_node *>(prop->data);
+            if (node && node->format == MPV_FORMAT_NODE_ARRAY) {
+                const mpv_node_list *arr = node->u.list;
+                for (int i = 0; i < arr->num; ++i) {
+                    const mpv_node *track = &arr->values[i];
+                    const mpv_node *type = mapGet(track, "type");
+                    const mpv_node *sel = mapGet(track, "selected");
+                    if (!type || type->format != MPV_FORMAT_STRING)
+                        continue;
+                    const bool selected = sel && sel->format == MPV_FORMAT_FLAG
+                                          && sel->u.flag;
+                    if (std::strcmp(type->u.string, "audio") == 0) {
+                        ++aCount;
+                        if (selected)
+                            aCur = aCount;
+                    } else if (std::strcmp(type->u.string, "sub") == 0) {
+                        ++sCount;
+                        if (selected)
+                            sCur = sCount;
+                    }
+                }
+            }
+        }
+        if (aCount != m_audioTrackCount || aCur != m_audioTrackCurrent) {
+            m_audioTrackCount = aCount;
+            m_audioTrackCurrent = aCur;
+            emit audioTracksChanged();
+        }
+        if (sCount != m_subTrackCount || sCur != m_subTrackCurrent) {
+            m_subTrackCount = sCount;
+            m_subTrackCurrent = sCur;
+            emit subTracksChanged();
+        }
     }
 }

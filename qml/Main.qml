@@ -22,6 +22,23 @@ Window {
         return (h > 0 ? h + ":" : "") + mm + ":" + ss;
     }
 
+    // Cycle audio among real tracks only — never the "no" (disabled) state.
+    // mpv's aid is 1-based and sequential per audio track, matching
+    // audioTrackCurrent, so we can select the next track's aid directly.
+    function cycleAudioTrack() {
+        if (player.audioTrackCount > 0) {
+            var next = (player.audioTrackCurrent % player.audioTrackCount) + 1;
+            player.command(["set", "aid", next]);
+        }
+        player.forceActiveFocus();
+    }
+
+    // Subtitles keep cycling through off (mpv's default cycle).
+    function toggleSubtitle() {
+        player.command(["cycle", "sub"]);
+        player.forceActiveFocus();
+    }
+
     // Phosphor icon font, bundled as a module resource.
     FontLoader {
         id: phosphorFont
@@ -35,18 +52,24 @@ Window {
         "prev": String.fromCharCode(0xe5a4),
         "next": String.fromCharCode(0xe5a6),
         "volume": String.fromCharCode(0xe44a),
-        "mute": String.fromCharCode(0xe45a)
+        "mute": String.fromCharCode(0xe45a),
+        "subtitle": String.fromCharCode(0xe1a8), // subtitles
+        "audio": String.fromCharCode(0xe802)     // waveform
     })
 
-    // A small icon button rendering a Phosphor glyph.
+    // A small icon button rendering a Phosphor glyph, with an optional text
+    // label beside it. `contentOpacity` dims the whole thing (e.g. when no
+    // track of that type exists).
     component IconButton: Item {
         id: ib
         property string glyph
+        property string label: ""
         property color color: "#f0f0f0"
-        property int glyphSize: 22
+        property int glyphSize: 18
+        property real contentOpacity: 1.0
         signal clicked()
 
-        implicitWidth: 38
+        implicitWidth: content.implicitWidth + 14
         implicitHeight: 30
 
         Rectangle {
@@ -55,12 +78,26 @@ Window {
             color: hover.hovered ? Qt.rgba(1, 1, 1, 0.12) : "transparent"
         }
 
-        Text {
+        Row {
+            id: content
             anchors.centerIn: parent
-            text: ib.glyph
-            color: ib.color
-            font.family: phosphorFont.font.family
-            font.pixelSize: ib.glyphSize
+            spacing: 4
+            opacity: ib.contentOpacity
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: ib.glyph
+                color: ib.color
+                font.family: phosphorFont.font.family
+                font.pixelSize: ib.glyphSize
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: ib.label !== ""
+                text: ib.label
+                color: ib.color
+                font.pixelSize: 12
+            }
         }
 
         HoverHandler { id: hover }
@@ -88,6 +125,14 @@ Window {
                 break;
             case Qt.Key_Right:
                 player.command(["seek", 5]);
+                event.accepted = true;
+                break;
+            case Qt.Key_S:
+                root.toggleSubtitle();
+                event.accepted = true;
+                break;
+            case Qt.Key_A:
+                root.cycleAudioTrack();
                 event.accepted = true;
                 break;
             case Qt.Key_Q:
@@ -132,8 +177,8 @@ Window {
             bottom: parent.bottom
         }
         height: contentColumn.implicitHeight + 20
-        // #0a0a0a at 80% opacity (alpha kept in the color so child controls stay opaque).
-        color: Qt.rgba(0x0a / 255, 0x0a / 255, 0x0a / 255, 0.8)
+        // rgba(10, 10, 10, 0.85) — alpha kept in the color so child controls stay opaque.
+        color: Qt.rgba(10 / 255, 10 / 255, 10 / 255, 0.85)
 
         Column {
             id: contentColumn
@@ -325,10 +370,11 @@ Window {
                 }
             }
 
-            // Info row: left = status/codec/resolution/audio, right = times.
+            // Info row: left = status/codec/resolution/audio,
+            // right = subtitle + audio-track buttons, then times.
             Item {
                 width: parent.width
-                height: Math.max(infoText.implicitHeight, timeText.implicitHeight)
+                height: 30
 
                 Text {
                     id: infoText
@@ -342,13 +388,32 @@ Window {
                           + "   ·   " + (player.audioCodec !== "" ? player.audioCodec : "—")
                 }
 
-                Text {
-                    id: timeText
+                Row {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    color: "#e8e8e8"
-                    font.pixelSize: 13
-                    text: root.fmt(player.position) + " / " + root.fmt(player.duration)
+                    spacing: 6
+
+                    IconButton { // subtitle track toggle
+                        glyph: root.ph.subtitle
+                        label: player.subTrackCurrent + "/" + player.subTrackCount
+                        contentOpacity: player.subTrackCount === 0 ? 0.4 : 1.0
+                        onClicked: root.toggleSubtitle()
+                    }
+                    IconButton { // audio track toggle
+                        glyph: root.ph.audio
+                        label: player.audioTrackCurrent + "/" + player.audioTrackCount
+                        contentOpacity: player.audioTrackCount === 0 ? 0.4 : 1.0
+                        onClicked: root.cycleAudioTrack()
+                    }
+                    Text {
+                        id: timeText
+                        height: 30
+                        leftPadding: 4
+                        verticalAlignment: Text.AlignVCenter
+                        color: "#e8e8e8"
+                        font.pixelSize: 13
+                        text: root.fmt(player.position) + " / " + root.fmt(player.duration)
+                    }
                 }
             }
         }

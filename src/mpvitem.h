@@ -31,6 +31,10 @@ class MpvItem : public QQuickFramebufferObject
     Q_PROPERTY(QString audioCodec READ audioCodec NOTIFY audioCodecChanged)
     Q_PROPERTY(int videoWidth READ videoWidth NOTIFY videoSizeChanged)
     Q_PROPERTY(int videoHeight READ videoHeight NOTIFY videoSizeChanged)
+    Q_PROPERTY(int audioTrackCount READ audioTrackCount NOTIFY audioTracksChanged)
+    Q_PROPERTY(int audioTrackCurrent READ audioTrackCurrent NOTIFY audioTracksChanged)
+    Q_PROPERTY(int subTrackCount READ subTrackCount NOTIFY subTracksChanged)
+    Q_PROPERTY(int subTrackCurrent READ subTrackCurrent NOTIFY subTracksChanged)
 
 public:
     explicit MpvItem(QQuickItem *parent = nullptr);
@@ -49,6 +53,10 @@ public:
     QString audioCodec() const { return m_audioCodec; }
     int videoWidth() const { return m_videoWidth; }
     int videoHeight() const { return m_videoHeight; }
+    int audioTrackCount() const { return m_audioTrackCount; }
+    int audioTrackCurrent() const { return m_audioTrackCurrent; }
+    int subTrackCount() const { return m_subTrackCount; }
+    int subTrackCurrent() const { return m_subTrackCurrent; }
 
     // Issue an mpv command from QML, e.g. command(["cycle", "pause"]).
     Q_INVOKABLE void command(const QVariant &args);
@@ -76,6 +84,8 @@ signals:
     void videoCodecChanged();
     void audioCodecChanged();
     void videoSizeChanged();
+    void audioTracksChanged();
+    void subTracksChanged();
 
 private slots:
     void doUpdate();
@@ -96,4 +106,8 @@ private:
     QString m_audioCodec;
     int m_videoWidth = 0;
     int m_videoHeight = 0;
+    int m_audioTrackCount = 0;
+    int m_audioTrackCurrent = 0;
+    int m_subTrackCount = 0;
+    int m_subTrackCurrent = 0;
 };
