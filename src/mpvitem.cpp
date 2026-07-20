@@ -119,6 +119,7 @@ MpvItem::MpvItem(QQuickItem *parent) : QQuickFramebufferObject(parent)
     mpv_observe_property(m_mpv, 0, "time-pos", MPV_FORMAT_DOUBLE);
     mpv_observe_property(m_mpv, 0, "duration", MPV_FORMAT_DOUBLE);
     mpv_observe_property(m_mpv, 0, "pause", MPV_FORMAT_FLAG);
+    mpv_observe_property(m_mpv, 0, "mute", MPV_FORMAT_FLAG);
     mpv_observe_property(m_mpv, 0, "video-format", MPV_FORMAT_STRING);
     mpv_observe_property(m_mpv, 0, "audio-codec-name", MPV_FORMAT_STRING);
     mpv_observe_property(m_mpv, 0, "video-params/w", MPV_FORMAT_INT64);
@@ -241,6 +242,10 @@ void MpvItem::handlePropertyChange(mpv_event_property *prop)
         if (prop->format == MPV_FORMAT_FLAG)
             m_paused = *static_cast<int *>(prop->data) != 0;
         emit pausedChanged();
+    } else if (name == "mute") {
+        if (prop->format == MPV_FORMAT_FLAG)
+            m_muted = *static_cast<int *>(prop->data) != 0;
+        emit mutedChanged();
     } else if (name == "video-format") {
         m_videoCodec = prop->format == MPV_FORMAT_STRING
                            ? QString::fromUtf8(*static_cast<char **>(prop->data))

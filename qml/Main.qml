@@ -22,14 +22,6 @@ Window {
         return (h > 0 ? h + ":" : "") + mm + ":" + ss;
     }
 
-    // Seek to a fraction [0..1] of the media.
-    function seekTo(frac) {
-        frac = Math.max(0, Math.min(1, frac));
-        if (player.duration > 0)
-            player.command(["seek", frac * player.duration, "absolute"]);
-        player.forceActiveFocus(); // keep keyboard shortcuts working
-    }
-
     MpvItem {
         id: player
         anchors.fill: parent
@@ -109,7 +101,33 @@ Window {
                 id: seekBar
                 width: parent.width
                 height: 16
-                property real fraction: player.duration > 0 ? player.position / player.duration : 0
+
+                // While scrubbing, follow the cursor directly so the handle
+                // never lags behind mpv's seek round-trip; otherwise track
+                // actual playback position.
+                property bool seeking: false
+                property bool restoreMuted: false
+                property real dragFraction: 0
+                property real fraction: seeking
+                    ? dragFraction
+                    : (player.duration > 0 ? player.position / player.duration : 0)
+
+                function fractionAt(x) {
+                    return Math.max(0, Math.min(1, x / width));
+                }
+
+                // Throttle live previews while dragging to fast keyframe seeks
+                // (inexact but cheap), so we don't flood mpv with exact seeks.
+                Timer {
+                    interval: 150
+                    repeat: true
+                    running: seekBar.seeking
+                    onTriggered: {
+                        if (player.duration > 0)
+                            player.command(["seek", seekBar.dragFraction * player.duration,
+                                            "absolute+keyframes"]);
+                    }
+                }
 
                 Rectangle { // track
                     anchors.verticalCenter: parent.verticalCenter
@@ -138,17 +156,29 @@ Window {
 
                 MouseArea {
                     anchors.fill: parent
-                    hoverEnabled: false
-                    property bool dragging: false
                     onPressed: (mouse) => {
-                        dragging = true;
-                        root.seekTo(mouse.x / width);
+                        // Silence the choppy audio that repeated seeks produce;
+                        // remember the prior mute state to restore on release.
+                        seekBar.restoreMuted = player.muted;
+                        player.command(["set", "mute", "yes"]);
+                        seekBar.dragFraction = seekBar.fractionAt(mouse.x);
+                        seekBar.seeking = true;
                     }
                     onPositionChanged: (mouse) => {
-                        if (dragging)
-                            root.seekTo(mouse.x / width);
+                        if (seekBar.seeking)
+                            seekBar.dragFraction = seekBar.fractionAt(mouse.x);
                     }
-                    onReleased: dragging = false
+                    onReleased: (mouse) => {
+                        seekBar.dragFraction = seekBar.fractionAt(mouse.x);
+                        seekBar.seeking = false;
+                        // Land on the exact frame once the drag ends.
+                        if (player.duration > 0)
+                            player.command(["seek", seekBar.dragFraction * player.duration,
+                                            "absolute+exact"]);
+                        // Restore audio last, so the final seek's blip stays muted.
+                        player.command(["set", "mute", seekBar.restoreMuted ? "yes" : "no"]);
+                        player.forceActiveFocus();
+                    }
                 }
             }
 
