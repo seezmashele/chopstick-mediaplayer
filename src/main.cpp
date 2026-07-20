@@ -24,16 +24,15 @@ int main(int argc, char *argv[])
     // AFTER constructing QGuiApplication, or mpv_initialize misbehaves.
     std::setlocale(LC_NUMERIC, "C");
 
-    // Optional file path from the command line, opened on startup by Main.qml.
-    // Passed to mpv's loadfile as-is, which accepts local paths and URLs.
-    QString startupFile;
-    const QStringList args = QGuiApplication::arguments();
-    if (args.size() > 1)
-        startupFile = args.at(1);
+    // Optional file paths from the command line, opened on startup by Main.qml:
+    // the first plays, the rest queue onto the playlist. Passed to mpv's
+    // loadfile as-is, which accepts local paths and URLs.
+    QStringList startupFiles = QGuiApplication::arguments();
+    startupFiles.removeFirst(); // drop argv[0]
 
     QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty(QStringLiteral("startupFile"),
-                                             startupFile);
+    engine.rootContext()->setContextProperty(QStringLiteral("startupFiles"),
+                                             startupFiles);
 
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app,

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstring>
 
+#include <QFileInfo>
 #include <QOpenGLContext>
 #include <QOpenGLFramebufferObject>
 #include <QtGlobal>
@@ -139,6 +140,7 @@ MpvItem::MpvItem(QQuickItem *parent) : QQuickFramebufferObject(parent)
     mpv_observe_property(m_mpv, 0, "video-params/w", MPV_FORMAT_INT64);
     mpv_observe_property(m_mpv, 0, "video-params/h", MPV_FORMAT_INT64);
     mpv_observe_property(m_mpv, 0, "track-list", MPV_FORMAT_NODE);
+    mpv_observe_property(m_mpv, 0, "playlist", MPV_FORMAT_NODE);
 }
 
 MpvItem::~MpvItem()
@@ -182,14 +184,10 @@ void MpvItem::loadFile(const QString &path)
     command(QVariantList{QStringLiteral("loadfile"), path});
 }
 
-void MpvItem::openUrls(const QList<QUrl> &urls)
+void MpvItem::openPaths(const QStringList &paths)
 {
     bool first = true;
-    for (const QUrl &url : urls) {
-        // Local files become clean filesystem paths (no file:// / percent
-        // encoding); remote URLs pass through for mpv to handle.
-        const QString target =
-            url.isLocalFile() ? url.toLocalFile() : url.toString();
+    for (const QString &target : paths) {
         if (target.isEmpty())
             continue;
 
@@ -201,6 +199,18 @@ void MpvItem::openUrls(const QList<QUrl> &urls)
                                  QStringLiteral("append-play")});
         }
     }
+}
+
+void MpvItem::openUrls(const QList<QUrl> &urls)
+{
+    QStringList paths;
+    paths.reserve(urls.size());
+    for (const QUrl &url : urls) {
+        // Local files become clean filesystem paths (no file:// / percent
+        // encoding); remote URLs pass through for mpv to handle.
+        paths.append(url.isLocalFile() ? url.toLocalFile() : url.toString());
+    }
+    openPaths(paths);
 }
 
 void MpvItem::beginWindowDrag()
@@ -327,5 +337,45 @@ void MpvItem::handlePropertyChange(mpv_event_property *prop)
             m_subTrackCurrent = sCur;
             emit subTracksChanged();
         }
+    } else if (name == "playlist") {
+        QVariantList entries;
+        int pos = -1;
+        if (prop->format == MPV_FORMAT_NODE) {
+            const mpv_node *node = static_cast<mpv_node *>(prop->data);
+            if (node && node->format == MPV_FORMAT_NODE_ARRAY) {
+                const mpv_node_list *arr = node->u.list;
+                for (int i = 0; i < arr->num; ++i) {
+                    const mpv_node *entry = &arr->values[i];
+                    const mpv_node *fn = mapGet(entry, "filename");
+                    const mpv_node *ti = mapGet(entry, "title");
+                    const mpv_node *cur = mapGet(entry, "current");
+
+                    const QString filename =
+                        (fn && fn->format == MPV_FORMAT_STRING)
+                            ? QString::fromUtf8(fn->u.string)
+                            : QString();
+                    QString title = (ti && ti->format == MPV_FORMAT_STRING)
+                                        ? QString::fromUtf8(ti->u.string)
+                                        : QString();
+                    // Fall back to the file's basename when it has no title.
+                    if (title.isEmpty())
+                        title = QFileInfo(filename).fileName();
+
+                    const bool isCurrent = cur && cur->format == MPV_FORMAT_FLAG
+                                           && cur->u.flag;
+                    if (isCurrent)
+                        pos = i;
+
+                    entries.append(QVariantMap{
+                        {QStringLiteral("title"), title},
+                        {QStringLiteral("filename"), filename},
+                        {QStringLiteral("current"), isCurrent},
+                    });
+                }
+            }
+        }
+        m_playlist = entries;
+        m_playlistPos = pos;
+        emit playlistChanged();
     }
 }

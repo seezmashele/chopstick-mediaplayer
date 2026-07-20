@@ -35,6 +35,9 @@ class MpvItem : public QQuickFramebufferObject
     Q_PROPERTY(int audioTrackCurrent READ audioTrackCurrent NOTIFY audioTracksChanged)
     Q_PROPERTY(int subTrackCount READ subTrackCount NOTIFY subTracksChanged)
     Q_PROPERTY(int subTrackCurrent READ subTrackCurrent NOTIFY subTracksChanged)
+    // Playlist entries as maps: { title, filename, current }.
+    Q_PROPERTY(QVariantList playlist READ playlist NOTIFY playlistChanged)
+    Q_PROPERTY(int playlistPos READ playlistPos NOTIFY playlistChanged)
 
 public:
     explicit MpvItem(QQuickItem *parent = nullptr);
@@ -57,13 +60,16 @@ public:
     int audioTrackCurrent() const { return m_audioTrackCurrent; }
     int subTrackCount() const { return m_subTrackCount; }
     int subTrackCurrent() const { return m_subTrackCurrent; }
+    QVariantList playlist() const { return m_playlist; }
+    int playlistPos() const { return m_playlistPos; }
 
     // Issue an mpv command from QML, e.g. command(["cycle", "pause"]).
     Q_INVOKABLE void command(const QVariant &args);
     // Convenience for the common case of opening a file.
     Q_INVOKABLE void loadFile(const QString &path);
-    // Open dropped/selected files: the first replaces playback, the rest are
-    // appended to mpv's playlist.
+    // Open files: the first replaces playback, the rest are appended to mpv's
+    // playlist. openUrls() resolves local URLs to paths and delegates here.
+    Q_INVOKABLE void openPaths(const QStringList &paths);
     Q_INVOKABLE void openUrls(const QList<QUrl> &urls);
     // Hand off to the compositor to move the window (required on Wayland, where
     // an app can't set its own position). Call while a mouse button is held.
@@ -89,6 +95,7 @@ signals:
     void videoSizeChanged();
     void audioTracksChanged();
     void subTracksChanged();
+    void playlistChanged();
 
 private slots:
     void doUpdate();
@@ -113,4 +120,6 @@ private:
     int m_audioTrackCurrent = 0;
     int m_subTrackCount = 0;
     int m_subTrackCurrent = 0;
+    QVariantList m_playlist;
+    int m_playlistPos = -1;
 };

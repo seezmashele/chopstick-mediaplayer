@@ -54,6 +54,11 @@ Window {
     // Individually toggleable sections of the bar (Ctrl+2 / Ctrl+5).
     property bool controlsRowVisible: true
     property bool statusRowVisible: true
+    // Playlist panel (Ctrl+7). Width is drag-resizable from the panel's left edge.
+    property bool playlistVisible: true
+    property real playlistWidth: 320
+    readonly property real playlistMinWidth: 240
+    readonly property real playlistMaxWidth: 720
 
     Timer {
         id: hideControlsTimer
@@ -91,7 +96,8 @@ Window {
         "volume": String.fromCharCode(0xe44a),
         "mute": String.fromCharCode(0xe45a),
         "subtitle": String.fromCharCode(0xe1a8), // subtitles
-        "audio": String.fromCharCode(0xe802)     // waveform
+        "audio": String.fromCharCode(0xe802),    // waveform
+        "close": String.fromCharCode(0xe4f6)     // x
     })
 
     // A small icon button rendering a Phosphor glyph, with an optional text
@@ -184,6 +190,12 @@ Window {
                     event.accepted = true;
                 }
                 break;
+            case Qt.Key_7:
+                if (event.modifiers & Qt.ControlModifier) {
+                    root.playlistVisible = !root.playlistVisible;
+                    event.accepted = true;
+                }
+                break;
             case Qt.Key_Return:
             case Qt.Key_Enter:
                 if (event.modifiers & Qt.AltModifier) {
@@ -207,8 +219,8 @@ Window {
         // Load only after the render context exists (vo=libmpv needs it first),
         // otherwise mpv fails to initialize video output.
         onReady: {
-            if (startupFile && startupFile.length > 0)
-                player.loadFile(startupFile);
+            if (startupFiles && startupFiles.length > 0)
+                player.openPaths(startupFiles);
         }
     }
 
@@ -258,6 +270,176 @@ Window {
                 player.beginWindowDrag();
         }
         onDoubleClicked: root.toggleFullScreen()
+    }
+
+    // Playlist panel — overlays the video on the right. Its bottom tracks
+    // controlBar.top, so it grows/shrinks automatically as bar rows are toggled
+    // (Ctrl+2 / Ctrl+5) or the bar auto-hides.
+    Rectangle {
+        id: playlistPanel
+        width: root.playlistWidth
+        anchors {
+            top: parent.top
+            right: parent.right
+            bottom: controlBar.top
+            rightMargin: root.playlistVisible ? 0 : -playlistPanel.width
+        }
+        color: Qt.rgba(10 / 255, 10 / 255, 10 / 255, 0.9)
+        opacity: root.playlistVisible ? 1 : 0
+
+        Behavior on anchors.rightMargin {
+            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+        }
+        Behavior on opacity {
+            NumberAnimation { duration: 200 }
+        }
+
+        // Swallow clicks so they don't reach the window-drag / double-click
+        // area beneath, but still wake the auto-hiding bar on hover (the panel
+        // can cover the hot zone once the bar is hidden).
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            onPositionChanged: (mouse) => root.nudgeControls(mouse.y)
+        }
+
+        IconButton {
+            id: playlistClose
+            anchors {
+                top: parent.top
+                right: parent.right
+                topMargin: 6
+                rightMargin: 6
+            }
+            glyph: root.ph.close
+            glyphSize: 16
+            color: "#c8c8c8"
+            onClicked: {
+                root.playlistVisible = false;
+                player.forceActiveFocus();
+            }
+        }
+
+        ListView {
+            id: playlistView
+            anchors {
+                top: playlistClose.bottom
+                left: parent.left
+                right: parent.right
+                bottom: parent.bottom
+                topMargin: 10
+                leftMargin: 8
+                rightMargin: 8
+                bottomMargin: 10
+            }
+            clip: true
+            spacing: 2
+            model: player.playlist
+
+            delegate: Rectangle {
+                required property var modelData
+                required property int index
+
+                width: ListView.view.width
+                height: 34
+                radius: 4
+                color: modelData.current ? Qt.rgba(1, 1, 1, 0.14)
+                     : entryHover.hovered ? Qt.rgba(1, 1, 1, 0.07)
+                     : "transparent"
+
+                Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    spacing: 8
+
+                    Item { // index, or a play glyph for the current entry
+                        width: 16
+                        height: parent.height
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: !modelData.current
+                            text: index + 1
+                            color: "#8a8a8a"
+                            font.pixelSize: 12
+                        }
+                        Text {
+                            anchors.centerIn: parent
+                            visible: modelData.current
+                            text: root.ph.play
+                            font.family: phosphorFont.font.family
+                            font.pixelSize: 12
+                            color: "#ffcf8a"
+                        }
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - 32
+                        elide: Text.ElideRight
+                        text: modelData.title
+                        color: modelData.current ? "#ffffff" : "#d0d0d0"
+                        font.pixelSize: 12
+                    }
+                }
+
+                HoverHandler { id: entryHover }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        player.command(["set", "playlist-pos", index]);
+                        player.forceActiveFocus();
+                    }
+                }
+            }
+        }
+
+        // Drag the panel's left edge to resize. Declared last so it sits above
+        // the list and the catch-all area.
+        MouseArea {
+            id: playlistResizer
+            anchors {
+                left: parent.left
+                top: parent.top
+                bottom: parent.bottom
+            }
+            width: 6
+            cursorShape: Qt.SizeHorCursor
+            hoverEnabled: true
+
+            property real pressSceneX: 0
+            property real startWidth: 0
+
+            // Track in scene coordinates: the handle itself moves as the panel
+            // resizes, so local x would drift mid-drag.
+            onPressed: (mouse) => {
+                pressSceneX = mapToItem(null, Qt.point(mouse.x, mouse.y)).x;
+                startWidth = root.playlistWidth;
+            }
+            onPositionChanged: (mouse) => {
+                if (!pressed)
+                    return;
+                const sceneX = mapToItem(null, Qt.point(mouse.x, mouse.y)).x;
+                const delta = pressSceneX - sceneX; // drag left ⇒ wider
+                root.playlistWidth = Math.max(
+                    root.playlistMinWidth,
+                    Math.min(root.playlistMaxWidth, startWidth + delta));
+            }
+        }
+
+        // Subtle grab affordance on the resize edge.
+        Rectangle {
+            anchors {
+                left: parent.left
+                top: parent.top
+                bottom: parent.bottom
+            }
+            width: 1
+            color: playlistResizer.pressed || playlistResizer.containsMouse
+                ? Qt.rgba(1, 1, 1, 0.35) : Qt.rgba(1, 1, 1, 0.10)
+        }
     }
 
     // Bottom control bar: seek bar + info row.
