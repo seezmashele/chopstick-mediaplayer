@@ -14,6 +14,9 @@ int main(int argc, char *argv[])
 
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName(QStringLiteral("Chopstick Media Player"));
+    // QSettings (used by the QML Settings type) needs an organization to derive
+    // its storage path: ~/.config/Chopstick/Chopstick Media Player.conf
+    QGuiApplication::setOrganizationName(QStringLiteral("Chopstick"));
     // Wayland compositors resolve the window icon via the .desktop file matched
     // to this name, so set it alongside the icon itself.
     QGuiApplication::setDesktopFileName(QStringLiteral("chopstick"));

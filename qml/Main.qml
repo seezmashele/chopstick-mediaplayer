@@ -1,4 +1,5 @@
 import QtQuick
+import QtCore
 import Chopstick
 
 Window {
@@ -59,10 +60,23 @@ Window {
     property bool controlsRowVisible: true
     property bool statusRowVisible: true
     // Playlist panel (Ctrl+7). Width is drag-resizable from the panel's left edge.
-    property bool playlistVisible: true
+    // Hidden by default on first run; afterwards the stored setting wins.
+    property bool playlistVisible: false
     property real playlistWidth: 320
     readonly property real playlistMinWidth: 240
     readonly property real playlistMaxWidth: 720
+
+    // Remembers which UI elements the user hid, plus the panel width. The
+    // aliases are bidirectional: stored values load at startup, and changes are
+    // written back automatically. Each property's declared default is what
+    // first-run uses.
+    Settings {
+        category: "ui"
+        property alias playlistVisible: root.playlistVisible
+        property alias controlsRowVisible: root.controlsRowVisible
+        property alias statusRowVisible: root.statusRowVisible
+        property alias playlistWidth: root.playlistWidth
+    }
 
     Timer {
         id: hideControlsTimer
@@ -394,16 +408,16 @@ Window {
         }
     }
 
-    // Playlist panel — overlays the video on the right. Its bottom tracks
-    // controlBar.top, so it grows/shrinks automatically as bar rows are toggled
-    // (Ctrl+2 / Ctrl+5) or the bar auto-hides.
+    // Playlist panel — overlays the video on the right, spanning the full window
+    // height. The control bar is declared after this, so it draws over the
+    // panel's bottom edge.
     Rectangle {
         id: playlistPanel
         width: root.playlistWidth
         anchors {
             top: parent.top
             right: parent.right
-            bottom: controlBar.top
+            bottom: parent.bottom
             rightMargin: root.playlistVisible ? 0 : -playlistPanel.width
         }
         color: Qt.rgba(10 / 255, 10 / 255, 10 / 255, 0.9)
