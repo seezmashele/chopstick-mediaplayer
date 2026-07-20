@@ -1,8 +1,11 @@
 #include "mpvitem.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 
+#include <QCollator>
+#include <QDir>
 #include <QFileInfo>
 #include <QOpenGLContext>
 #include <QOpenGLFramebufferObject>
@@ -21,6 +24,16 @@ void *getProcAddressMpv(void *ctx, const char *name)
         return nullptr;
     return reinterpret_cast<void *>(glctx->getProcAddress(QByteArray(name)));
 }
+
+// Media files we consider when stepping through a folder. Matched against the
+// lowercased suffix, so uppercase extensions (.MP4) work too.
+const QStringList kMediaSuffixes = {
+    // video
+    "mp4", "mkv", "webm", "avi", "mov", "m4v", "mpg", "mpeg", "wmv", "flv",
+    "ts", "m2ts", "mts", "ogv", "3gp", "divx",
+    // audio
+    "mp3", "flac", "m4a", "aac", "ogg", "oga", "opus", "wav", "wma", "alac",
+};
 
 // Look up a value by key in an mpv node map; returns nullptr if absent.
 const mpv_node *mapGet(const mpv_node *map, const char *key)
@@ -136,6 +149,7 @@ MpvItem::MpvItem(QQuickItem *parent) : QQuickFramebufferObject(parent)
     mpv_observe_property(m_mpv, 0, "mute", MPV_FORMAT_FLAG);
     mpv_observe_property(m_mpv, 0, "volume", MPV_FORMAT_DOUBLE);
     mpv_observe_property(m_mpv, 0, "filename", MPV_FORMAT_STRING);
+    mpv_observe_property(m_mpv, 0, "path", MPV_FORMAT_STRING);
     mpv_observe_property(m_mpv, 0, "video-format", MPV_FORMAT_STRING);
     mpv_observe_property(m_mpv, 0, "audio-codec-name", MPV_FORMAT_STRING);
     mpv_observe_property(m_mpv, 0, "video-params/w", MPV_FORMAT_INT64);
@@ -220,6 +234,47 @@ void MpvItem::beginWindowDrag()
         w->startSystemMove();
 }
 
+void MpvItem::stepFolder(int delta)
+{
+    if (!m_mpv || delta == 0 || m_lastPath.isEmpty())
+        return;
+
+    const QFileInfo current(m_lastPath);
+    // Streams and URLs have no folder to walk.
+    if (!current.exists() || !current.isFile())
+        return;
+
+    const QDir dir = current.absoluteDir();
+    QStringList names;
+    const QFileInfoList entries = dir.entryInfoList(QDir::Files | QDir::Readable);
+    for (const QFileInfo &entry : entries) {
+        if (kMediaSuffixes.contains(entry.suffix().toLower()))
+            names.append(entry.fileName());
+    }
+    if (names.isEmpty())
+        return;
+
+    // Natural, case-insensitive order so "vid2" sorts before "vid10", matching
+    // what a file manager shows rather than plain byte ordering.
+    QCollator collator;
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    std::sort(names.begin(), names.end(),
+              [&collator](const QString &a, const QString &b) {
+                  return collator.compare(a, b) < 0;
+              });
+
+    const int index = names.indexOf(current.fileName());
+    if (index < 0)
+        return;
+
+    const int target = index + delta;
+    if (target < 0 || target >= names.size())
+        return; // stop at the ends rather than wrapping
+
+    loadFile(dir.absoluteFilePath(names.at(target)));
+}
+
 void MpvItem::onMpvRedraw(void *ctx)
 {
     // Runs on mpv's render thread; the queued connection hops to the GUI thread.
@@ -249,8 +304,15 @@ void MpvItem::handleMpvEvents()
         mpv_event *event = mpv_wait_event(m_mpv, 0);
         if (event->event_id == MPV_EVENT_NONE)
             break;
-        if (event->event_id == MPV_EVENT_PROPERTY_CHANGE)
+        if (event->event_id == MPV_EVENT_PROPERTY_CHANGE) {
             handlePropertyChange(static_cast<mpv_event_property *>(event->data));
+        } else if (event->event_id == MPV_EVENT_END_FILE) {
+            // Only a natural end counts; errors, manual stops and playlist
+            // redirects shouldn't trigger folder auto-advance.
+            const auto *ef = static_cast<mpv_event_end_file *>(event->data);
+            if (ef->reason == MPV_END_FILE_REASON_EOF)
+                emit fileEnded();
+        }
     }
 }
 
@@ -287,6 +349,14 @@ void MpvItem::handlePropertyChange(mpv_event_property *prop)
                          ? QString::fromUtf8(*static_cast<char **>(prop->data))
                          : QString();
         emit fileNameChanged();
+    } else if (name == "path") {
+        // Remember the last real path; mpv clears this at end of playback but
+        // folder stepping still needs to know where we were.
+        if (prop->format == MPV_FORMAT_STRING) {
+            const QString p = QString::fromUtf8(*static_cast<char **>(prop->data));
+            if (!p.isEmpty())
+                m_lastPath = p;
+        }
     } else if (name == "video-format") {
         m_videoCodec = prop->format == MPV_FORMAT_STRING
                            ? QString::fromUtf8(*static_cast<char **>(prop->data))

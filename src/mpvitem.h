@@ -76,6 +76,10 @@ public:
     // Hand off to the compositor to move the window (required on Wayland, where
     // an app can't set its own position). Call while a mouse button is held.
     Q_INVOKABLE void beginWindowDrag();
+    // Play the neighbouring media file in the current file's folder
+    // (delta +1 = next, -1 = previous). Stops at the ends; no wrap-around.
+    // Works even for files that were never added to the playlist.
+    Q_INVOKABLE void stepFolder(int delta);
 
     // libmpv callbacks (called from mpv's threads).
     static void onMpvRedraw(void *ctx);  // new video frame available
@@ -86,6 +90,8 @@ signals:
     // Emitted once the mpv render context exists and it's safe to load a file.
     void ready();
     void mpvEventsPending();
+    // Emitted when a file finishes playing normally (reached its end).
+    void fileEnded();
 
     void positionChanged();
     void durationChanged();
@@ -116,6 +122,9 @@ private:
     bool m_muted = false;
     double m_volume = 100.0;
     QString m_fileName;
+    // Full path of the most recent file. Kept separately because mpv clears
+    // `path` once playback ends, and folder stepping still needs it then.
+    QString m_lastPath;
     QString m_videoCodec;
     QString m_audioCodec;
     int m_videoWidth = 0;

@@ -44,6 +44,11 @@ cmake --build build
 - **Playlist panel** (right side, overlay): resizable 240–720px by dragging its left edge,
   320px default, X to close, click an entry to jump to it. Current entry is highlighted with
   a play glyph; others show their index. Hidden by default.
+- **Folder navigation** — open a single file and prev/next walk the neighbouring media files
+  in its folder, even though they were never added to the playlist. Natural sort (`vid2`
+  before `vid10`), video/audio only, stops at the ends. When a file finishes it **rolls into
+  the next file automatically**. Only applies when a single file is open — a playlist you
+  built explicitly is navigated normally and never overwritten.
 
 ### Control bar (bottom)
 - **Seek bar** — click or drag to scrub. Handle follows the cursor directly; live previews
@@ -92,6 +97,7 @@ cmake --build build
 | `Space` / click video | Play / pause |
 | `←` / `→` | Seek ∓5s |
 | `↑` / `↓` / scroll | Volume ±5% |
+| `PgUp` / `PgDn` | Previous / next file |
 | `N` | Show filename |
 | `S` / `A` | Cycle subtitle / audio track |
 | `Alt+Enter` / double-click | Toggle fullscreen |
@@ -128,6 +134,10 @@ Things that cost real debugging — worth not rediscovering:
   panel resizes, so local coordinates drift mid-drag.
 - **Declaration order is load-bearing**: the control bar is declared *after* the playlist
   panel so it draws over it. Don't reorder.
+- **Folder stepping uses a remembered path**, not mpv's live `path` property — mpv clears
+  `path` when playback ends, which is exactly when auto-advance needs to know where it was.
+- **Auto-advance only chains on `MPV_END_FILE_REASON_EOF`** — errors, manual stops and
+  playlist redirects also raise end-file events, and chaining on those would misbehave.
 
 ---
 

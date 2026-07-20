@@ -40,6 +40,26 @@ Window {
         player.forceActiveFocus();
     }
 
+    // Prev/next: navigate the playlist when the user built one, otherwise walk
+    // the neighbouring files in the current file's folder. Folder stepping
+    // replaces what's loaded, so it's restricted to the single-file case — it
+    // must never wipe a playlist the user deliberately queued up.
+    function playNext() {
+        if (player.playlist.length > 1)
+            player.command(["playlist-next", "weak"]);
+        else
+            player.stepFolder(1);
+        player.forceActiveFocus();
+    }
+
+    function playPrevious() {
+        if (player.playlist.length > 1)
+            player.command(["playlist-prev", "weak"]);
+        else
+            player.stepFolder(-1);
+        player.forceActiveFocus();
+    }
+
     function toggleFullScreen() {
         root.visibility = (root.visibility === Window.FullScreen)
             ? Window.Windowed : Window.FullScreen;
@@ -227,6 +247,14 @@ Window {
                 root.showVolume();
                 event.accepted = true;
                 break;
+            case Qt.Key_PageUp:
+                root.playPrevious();
+                event.accepted = true;
+                break;
+            case Qt.Key_PageDown:
+                root.playNext();
+                event.accepted = true;
+                break;
             case Qt.Key_N:
                 root.showTitle();
                 event.accepted = true;
@@ -286,6 +314,14 @@ Window {
 
         // Flash the name whenever a new file starts playing.
         onFileNameChanged: root.showTitle()
+
+        // A file played to its end: roll into the next file in the folder.
+        // A real playlist advances itself, so only do this for the single-file
+        // case (same rule as playNext()).
+        onFileEnded: {
+            if (player.playlist.length <= 1)
+                player.stepFolder(1);
+        }
     }
 
     // Drop video files anywhere on the window to play them. First file replaces
@@ -719,10 +755,7 @@ Window {
 
                     IconButton {
                         glyph: root.ph.prev
-                        onClicked: {
-                            player.command(["playlist-prev", "weak"]);
-                            player.forceActiveFocus();
-                        }
+                        onClicked: root.playPrevious()
                     }
                     IconButton {
                         glyph: player.paused ? root.ph.play : root.ph.pause
@@ -733,10 +766,7 @@ Window {
                     }
                     IconButton {
                         glyph: root.ph.next
-                        onClicked: {
-                            player.command(["playlist-next", "weak"]);
-                            player.forceActiveFocus();
-                        }
+                        onClicked: root.playNext()
                     }
                 }
 
