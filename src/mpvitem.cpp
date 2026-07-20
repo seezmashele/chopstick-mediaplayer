@@ -203,6 +203,12 @@ void MpvItem::openUrls(const QList<QUrl> &urls)
     }
 }
 
+void MpvItem::beginWindowDrag()
+{
+    if (QQuickWindow *w = window())
+        w->startSystemMove();
+}
+
 void MpvItem::onMpvRedraw(void *ctx)
 {
     // Runs on mpv's render thread; the queued connection hops to the GUI thread.

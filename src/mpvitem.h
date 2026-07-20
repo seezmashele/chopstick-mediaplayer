@@ -65,6 +65,9 @@ public:
     // Open dropped/selected files: the first replaces playback, the rest are
     // appended to mpv's playlist.
     Q_INVOKABLE void openUrls(const QList<QUrl> &urls);
+    // Hand off to the compositor to move the window (required on Wayland, where
+    // an app can't set its own position). Call while a mouse button is held.
+    Q_INVOKABLE void beginWindowDrag();
 
     // libmpv callbacks (called from mpv's threads).
     static void onMpvRedraw(void *ctx);  // new video frame available

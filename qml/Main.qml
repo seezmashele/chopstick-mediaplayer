@@ -39,6 +39,12 @@ Window {
         player.forceActiveFocus();
     }
 
+    function toggleFullScreen() {
+        root.visibility = (root.visibility === Window.FullScreen)
+            ? Window.Windowed : Window.FullScreen;
+        player.forceActiveFocus();
+    }
+
     // Phosphor icon font, bundled as a module resource.
     FontLoader {
         id: phosphorFont
@@ -135,6 +141,19 @@ Window {
                 root.cycleAudioTrack();
                 event.accepted = true;
                 break;
+            case Qt.Key_Return:
+            case Qt.Key_Enter:
+                if (event.modifiers & Qt.AltModifier) {
+                    root.toggleFullScreen();
+                    event.accepted = true;
+                }
+                break;
+            case Qt.Key_Escape:
+                if (root.visibility === Window.FullScreen) {
+                    root.toggleFullScreen();
+                    event.accepted = true;
+                }
+                break;
             case Qt.Key_Q:
                 Qt.quit();
                 event.accepted = true;
@@ -166,6 +185,34 @@ Window {
                 drop.accept();
             }
         }
+    }
+
+    // Drag the video to move the window; double-click to toggle fullscreen.
+    // Covers the video region only (stops at the control bar so it doesn't
+    // interfere with the seek bar / buttons).
+    MouseArea {
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: controlBar.top
+        }
+        acceptedButtons: Qt.LeftButton
+        property real pressX: 0
+        property real pressY: 0
+
+        onPressed: (mouse) => {
+            pressX = mouse.x;
+            pressY = mouse.y;
+        }
+        onPositionChanged: (mouse) => {
+            // Only begin a window move once it's clearly a drag, so a stationary
+            // double-click still registers.
+            if (pressed && (Math.abs(mouse.x - pressX) > 8
+                            || Math.abs(mouse.y - pressY) > 8))
+                player.beginWindowDrag();
+        }
+        onDoubleClicked: root.toggleFullScreen()
     }
 
     // Bottom control bar: seek bar + info row.
