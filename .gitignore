@@ -1,0 +1,61 @@
+# Build output
+/build/
+build*/
+cmake-build-*/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+_deps/
+
+# Ninja
+.ninja_deps
+.ninja_log
+build.ninja
+rules.ninja
+
+# Qt / QML
+*.moc
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qmlc
+*.jsc
+.qmlls.ini
+*.qm
+
+# Qt Creator
+CMakeLists.txt.user
+CMakeLists.txt.user.*
+*.autosave
+*.pro.user
+*.pro.user.*
+
+# Compiled objects / binaries
+*.o
+*.obj
+*.so
+*.so.*
+*.a
+*.dll
+*.dylib
+*.exe
+/chopstick
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cache/
+compile_commands.json
+
+# OS cruft
+.DS_Store
+Thumbs.db
