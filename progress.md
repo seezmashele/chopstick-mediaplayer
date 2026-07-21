@@ -60,6 +60,7 @@ cmake --build build
   audio-track buttons showing `current/total`, then elapsed / duration.
 - **Auto-hides** 3s after the last pointer movement near the bottom; only movement in the
   bottom 140px wakes it. Never hides mid-interaction (hovering the bar, or scrubbing).
+  Toggling a bar row (Ctrl+2 / Ctrl+5) reveals the bar so the change is visible.
 
 ### Tracks
 - Subtitle and audio track counts/current parsed from mpv's `track-list`.

@@ -142,10 +142,15 @@ Window {
 
     // Called on pointer movement; only movement near the bottom wakes the bar.
     function nudgeControls(y) {
-        if (y >= root.height - root.controlsHotZone) {
-            root.controlsVisible = true;
-            hideControlsTimer.restart();
-        }
+        if (y >= root.height - root.controlsHotZone)
+            revealControls();
+    }
+
+    // Force the bar into view and reset its hide countdown — used when a change
+    // happens in the bar that the user should see (e.g. toggling its rows).
+    function revealControls() {
+        root.controlsVisible = true;
+        hideControlsTimer.restart();
     }
 
     // Phosphor icon font, bundled as a module resource.
@@ -270,12 +275,14 @@ Window {
             case Qt.Key_2:
                 if (event.modifiers & Qt.ControlModifier) {
                     root.controlsRowVisible = !root.controlsRowVisible;
+                    root.revealControls(); // let the user see the change
                     event.accepted = true;
                 }
                 break;
             case Qt.Key_5:
                 if (event.modifiers & Qt.ControlModifier) {
                     root.statusRowVisible = !root.statusRowVisible;
+                    root.revealControls();
                     event.accepted = true;
                 }
                 break;
@@ -419,7 +426,7 @@ Window {
         width: Math.min(badgeLabel.implicitWidth + 24, root.width * 0.5)
         height: 38
         radius: 6
-        color: Qt.rgba(10 / 255, 10 / 255, 10 / 255, 0.85)
+        color: Qt.rgba(20 / 255, 20 / 255, 20 / 255, 0.9)
         opacity: root.badgeVisible ? 1 : 0
         visible: opacity > 0
 
@@ -456,7 +463,7 @@ Window {
             bottom: parent.bottom
             rightMargin: root.playlistVisible ? 0 : -playlistPanel.width
         }
-        color: Qt.rgba(10 / 255, 10 / 255, 10 / 255, 0.9)
+        color: Qt.rgba(20 / 255, 20 / 255, 20 / 255, 0.9)
         opacity: root.playlistVisible ? 1 : 0
 
         Behavior on anchors.rightMargin {
@@ -631,15 +638,25 @@ Window {
             bottomMargin: root.controlsVisible ? 0 : -controlBar.height
         }
         height: contentColumn.implicitHeight + 20
-        // rgba(10, 10, 10, 0.9) — alpha kept in the color so child controls stay opaque.
-        color: Qt.rgba(10 / 255, 10 / 255, 10 / 255, 0.9)
+        // rgba(20, 20, 20, 0.9) — alpha kept in the color so child controls stay opaque.
+        color: Qt.rgba(20 / 255, 20 / 255, 20 / 255, 0.9)
         opacity: root.controlsVisible ? 1 : 0
 
+        // Smooth decelerating ease (cubic-bezier(0.22, 1, 0.36, 1)) for the
+        // slide + fade when the bar shows/hides.
         Behavior on anchors.bottomMargin {
-            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                duration: 380
+                easing.type: Easing.Bezier
+                easing.bezierCurve: [0.22, 1, 0.36, 1, 1, 1]
+            }
         }
         Behavior on opacity {
-            NumberAnimation { duration: 200 }
+            NumberAnimation {
+                duration: 380
+                easing.type: Easing.Bezier
+                easing.bezierCurve: [0.22, 1, 0.36, 1, 1, 1]
+            }
         }
 
         // Keeps the bar awake while the pointer rests on it.
@@ -851,10 +868,12 @@ Window {
                     anchors.verticalCenter: parent.verticalCenter
                     color: "#e8e8e8"
                     font.pixelSize: root.uiFontSize
+                    // Only show details that are present; no dash placeholders,
+                    // and no stray gaps when a field is missing.
                     text: (player.paused ? "Paused" : "Playing")
-                          + "   ·   " + (player.videoCodec !== "" ? player.videoCodec : "—")
-                          + "   ·   " + (player.videoWidth > 0 ? player.videoWidth + "×" + player.videoHeight : "—")
-                          + "   ·   " + (player.audioCodec !== "" ? player.audioCodec : "—")
+                          + (player.videoCodec !== "" ? "    " + player.videoCodec : "")
+                          + (player.videoWidth > 0 ? "    " + player.videoWidth + "×" + player.videoHeight : "")
+                          + (player.audioCodec !== "" ? "    " + player.audioCodec : "")
                 }
 
                 Row {
