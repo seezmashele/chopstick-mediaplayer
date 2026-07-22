@@ -426,7 +426,7 @@ Window {
         width: Math.min(badgeLabel.implicitWidth + 24, root.width * 0.5)
         height: 38
         radius: 6
-        color: Qt.rgba(20 / 255, 20 / 255, 20 / 255, 0.9)
+        color: Qt.rgba(15 / 255, 15 / 255, 15 / 255, 0.9)
         opacity: root.badgeVisible ? 1 : 0
         visible: opacity > 0
 
@@ -463,7 +463,7 @@ Window {
             bottom: parent.bottom
             rightMargin: root.playlistVisible ? 0 : -playlistPanel.width
         }
-        color: Qt.rgba(20 / 255, 20 / 255, 20 / 255, 0.9)
+        color: Qt.rgba(15 / 255, 15 / 255, 15 / 255, 0.9)
         opacity: root.playlistVisible ? 1 : 0
 
         Behavior on anchors.rightMargin {
@@ -638,8 +638,8 @@ Window {
             bottomMargin: root.controlsVisible ? 0 : -controlBar.height
         }
         height: contentColumn.implicitHeight + 20
-        // rgba(20, 20, 20, 0.9) — alpha kept in the color so child controls stay opaque.
-        color: Qt.rgba(20 / 255, 20 / 255, 20 / 255, 0.9)
+        // rgba(15, 15, 15, 0.9) — alpha kept in the color so child controls stay opaque.
+        color: Qt.rgba(15 / 255, 15 / 255, 15 / 255, 0.9)
         opacity: root.controlsVisible ? 1 : 0
 
         // Smooth decelerating ease (cubic-bezier(0.22, 1, 0.36, 1)) for the
